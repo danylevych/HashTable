@@ -204,19 +204,19 @@ public:
 		size++;
 	}
 
-	void Insert(const_iterator& iter)
+	std::pair<bool, iterator> Insert(const_iterator& iter)
 	{
-		Insert(iter->first, iter->second);
+		return Insert(iter->first, iter->second);
 	}
 
-	void Insert(const KeyType& key, ValType value)
+	std::pair<bool, iterator> Insert(const KeyType& key, ValType value)
 	{
 		size_t index = HashFunction<KeyType>()(key) % sizeOfBucket;
 
 		if (table[index] == nullptr)
 		{
 			table[index] = new Node(key, value);
-			return;
+			return std::make_pair(true, iterator(table, table[index], sizeOfBucket, index));
 		}
 
 		Node*& current = table[index];
@@ -226,7 +226,7 @@ public:
 			if (current->key == key)  // The key exist.
 			{
 				current->value = value;
-				return;
+				return std::make_pair(false, iterator(table, current, sizeOfBucket, index));
 			}
 			current = current->next;
 		}
@@ -234,11 +234,105 @@ public:
 		current->next = new Node(key, value, current);
 
 		size++;
+
+		return std::make_pair(true, iterator(table, current->next, sizeOfBucket, index));
 	}
 
-	void Insert(const std::pair<const KeyType, ValType>& insertPair)
+	std::pair<bool, iterator> Insert(const std::pair<const KeyType, ValType>& insertPair)
 	{
-		Insert(insertPair.first, insertPair.second);
+		return Insert(insertPair.first, insertPair.second);
+	}
+
+	bool Erase(const KeyType& key)
+	{
+		size_t index = HashFunction<KeyType>()(key) % sizeOfBucket;
+
+		Node* current = table[index];
+		Node* previous = current;
+
+		if (current == nullptr)
+		{
+			return false;
+		}
+
+		while (current->next != nullptr && current->key != key)  // Finding a deleting node.
+		{
+			previous = current;
+			current = current->next;
+		}
+
+		if (current->key == key)  // The node was found.
+		{
+			if (previous == current)  // The deleting node is the first in bucket.
+			{
+				table[index] = current->next;
+				if(current->next != nullptr)  // Deleting node has a next node.
+				{
+					table[index]->previous = nullptr;
+				}
+
+				delete current;
+			}
+			else if (current->next == nullptr)  // Deleting node is a final node in the chain.
+			{
+				previous->next = nullptr;
+				delete current;
+			}
+			else  // Deleting node is a chain middle node.
+			{
+				previous->next = current->next;
+				current->next->previous = previous;
+				
+				delete current;
+			}
+
+			size--;
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	bool Erase(iterator& iter)
+	{
+		if (!iter)  // The node doesn't exist.
+		{
+			return false;
+		}
+
+		Node* current = iter.iteratorBase::node;  // Taking the iterator pointing node.
+		
+		if (current->previous == nullptr)  // The deleting node is the first in bucket.
+		{
+			size_t index = HashFunction<KeyType>()(iter->first) % sizeOfBucket;
+
+			table[index] = current->next;
+			if (current->next != nullptr)  // Deleting node has a next node.
+			{
+				table[index]->previous = nullptr;
+			}
+
+			delete current;
+		}
+		else if (current->next == nullptr)  // Deleting node is a final node in the chain.
+		{
+			current->previous->next = nullptr;
+
+			delete current;
+		}
+		else // Deleting node is a chain middle node.
+		{
+			current->previous->next = current->next;
+			current->next->previous = current->previous;
+
+			delete current;
+		}
+
+		size--;
+		iter = ++iter;  // Moving iterator to the next node.
+		return true;
 	}
 
 
@@ -320,6 +414,9 @@ public:
 private:
 	class iteratorBase
 	{
+	private:
+		friend class HashTable;
+
 	protected:
 		size_t bucketID;
 		size_t sizeOfBucket;
@@ -356,6 +453,11 @@ private:
 			}
 
 			return std::make_unique<std::pair<const KeyType&, ValType&>>(node->key, node->value);
+		}
+
+		virtual operator bool() const
+		{
+			return node != nullptr;
 		}
 
 		virtual bool operator==(std::nullptr_t right)
@@ -720,12 +822,12 @@ private:
 		delete[] table;
 
 		this->sizeOfBucket = other.sizeOfBucket;
-		this->table = new Node * [other.sizeOfBucket]
+		this->table = new Node * [other.sizeOfBucket];
 
-			for (auto iter = other.cbegin(), end = other.cend(); iter != end; ++iter)
-			{
-				Insert(iter);
-			}
+		for (auto iter = other.cbegin(), end = other.cend(); iter != end; ++iter)
+		{
+			Insert(iter);
+		}
 	}
 
 	void MoveTabel(HashTable&& other)

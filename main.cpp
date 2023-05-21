@@ -8,17 +8,25 @@ int main()
 	HashTable<std::string, int> table =
 	{
 		std::pair<std::string, int>("world", 1),
+		std::pair<std::string, int>("hellp", 9),
 		std::pair<std::string, int>("hello", 9)
 	};
 
-	HashTable<std::string, int> table2{ table };
 
-	for (auto iter = table.rbegin(), end = table.rend(); iter != end; ++iter)
+	for (auto iter = table.begin(), end = table.end(); iter != end; ++iter)
 	{
 		std::cout << (*iter).second << std::endl;
 	}
-
-	std::cout << table2.Find("world")->first << std::endl;
+	auto iterq = ++table.begin();
+	
+	if (table.Erase(iterq))
+	{
+		std::cout << iterq->first << std::endl;
+		for (auto iter = table.begin(), end = table.end(); iter != end; ++iter)
+		{
+			std::cout << (*iter).first << std::endl;
+		}
+	}
 
 	return 0;
 }
